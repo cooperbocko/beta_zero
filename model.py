@@ -11,14 +11,14 @@ class ResBlock(nn.Module):
         super(ResBlock, self).__init__()
         self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False)
         self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(channels)
-        self.bn2 = nn.BatchNorm2d(channels)
+        self.gn1 = nn.GroupNorm(num_groups=channels//8, num_channels=channels)
+        self.gn2 = nn.GroupNorm(num_groups=channels//8, num_channels=channels)
         
     def forward(self, x):
         residual = x
         
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.bn2(self.conv2(out))
+        out = F.relu(self.gn1(self.conv1(x)))
+        out = self.gn2(self.conv2(out))
         
         out += residual
         out = F.relu(out)
@@ -28,30 +28,30 @@ class ResNet(nn.Module):
     def __init__(self, input_channels=13, n_blocks=10, n_channels=128, value_layers=64, n_actions=8*8*4):
         super(ResNet, self).__init__()
         self.conv_init = nn.Conv2d(input_channels, n_channels, kernel_size=3, padding=1, bias=False)
-        self.bn_init = nn.BatchNorm2d(n_channels)
+        self.gn_init = nn.GroupNorm(num_groups=n_channels//8, num_channels=n_channels)
         
         self.res_blocks = nn.ModuleList([ResBlock(n_channels) for _ in range(n_blocks-1)])
         
         self.policy_conv = nn.Conv2d(n_channels, 2, kernel_size=1, bias=False)
-        self.policy_bn = nn.BatchNorm2d(2)
+        self.policy_gn = nn.GroupNorm(num_groups=1, num_channels=2)
         self.policy = nn.Linear(2*8*8, n_actions)
         
         self.value_conv = nn.Conv2d(n_channels, 1, kernel_size=1, bias=False)
-        self.value_bn = nn.BatchNorm2d(1)
+        self.value_gn = nn.GroupNorm(num_groups=1, num_channels=1)
         self.value_linear = nn.Linear(1*8*8, value_layers, bias=False)
         self.value = nn.Linear(value_layers, 1)
         
     def forward(self, x):
-        x = F.relu(self.bn_init(self.conv_init(x)))
+        x = F.relu(self.gn_init(self.conv_init(x)))
         
         for block in self.res_blocks:
             x = block(x)
             
-        policy = F.relu(self.policy_bn(self.policy_conv(x)))
+        policy = F.relu(self.policy_gn(self.policy_conv(x)))
         policy = policy.view(policy.size(0), -1)
         policy = self.policy(policy)
         
-        value = F.relu(self.value_bn(self.value_conv(x)))
+        value = F.relu(self.value_gn(self.value_conv(x)))
         value = value.view(value.size(0), -1)
         value = F.relu(self.value_linear(value))
         value = self.value(value)
@@ -72,8 +72,9 @@ class ReplayBuffer():
         states = []
         action_probs = []
         values = []
-        for _ in range(batch_size):
-            game = random.choice(self.buffer)
+        game_lengths = [len(game[0]) for game in self.buffer]
+        sampled_games = random.choices(self.buffer, weights=game_lengths, k=batch_size)
+        for game in sampled_games:
             start = random.randint(0, len(game[0]) - 1)
             
             curr_state = game[0][start]
@@ -105,6 +106,29 @@ class ReplayBuffer():
             
         return states, action_probs, values
     
+class Trainer():
+    def __init__(self, model, device, replay_buffer, lr=0.001, weight_decay=1e-4):
+        self.model = model
+        self.optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
+        self.device = device
+        self.replay_buffer = replay_buffer
+        
+    def train(self, batch_size):
+        self.model.train()
+        states, t_action_probs, t_values = self.replay_buffer.sample(batch_size)
+        
+        states = torch.FloatTensor(np.array(states)).to(self.device)
+        t_action_probs = torch.FloatTensor(np.array(t_action_probs)).to(self.device)
+        t_values = torch.FloatTensor(np.array(t_values)).to(self.device)
+        
+        self.optimizer.zero_grad()
+        p_action_probs, p_values = self.model(states)
+        loss = F.cross_entropy(p_action_probs, t_action_probs) + F.mse_loss(p_values.view(-1), t_values.view(-1))
+        loss.backward()
+        self.optimizer.step()
+        
+        return loss.item()
+        
 class TTTReplayBuffer():
     def __init__(self, max_size=10000):
         self.buffer = []
@@ -119,9 +143,10 @@ class TTTReplayBuffer():
         states = []
         action_probs = []
         values = []
+        game_lengths = [len(game[0]) for game in self.buffer]
+        sampled_games = random.choices(self.buffer, weights=game_lengths, k=batch_size)
         
-        for _ in range(batch_size):
-            game = random.choice(self.buffer)
+        for game in sampled_games:
             start = random.randint(0, len(game[0]) - 1)
             
             curr_state = game[0][start]
@@ -133,12 +158,12 @@ class TTTReplayBuffer():
             turn = curr_state[2]
             
             h1_state = game[0][start-1] if start-1 >= 0 else [np.zeros((3, 3)), np.zeros((3, 3)), np.zeros((3, 3))]
-            h1_player = h1_state[0] if turn[0][0] == h1_state[2][0][0] else np.flip(h1_state[1])
-            h1_opponent = h1_state[1] if turn[0][0] == h1_state[2][0][0] else np.flip(h1_state[0])
+            h1_player = h1_state[0] if turn[0][0] == h1_state[2][0][0] else h1_state[1]
+            h1_opponent = h1_state[1] if turn[0][0] == h1_state[2][0][0] else h1_state[0]
             
             h2_state = game[0][start-2] if start-2 >= 0 else [np.zeros((3, 3)), np.zeros((3, 3)), np.zeros((3, 3))]
-            h2_player = h2_state[0] if turn[0][0] == h2_state[2][0][0] else np.flip(h2_state[1])
-            h2_opponent = h2_state[1] if turn[0][0] == h2_state[2][0][0] else np.flip(h2_state[0])
+            h2_player = h2_state[0] if turn[0][0] == h2_state[2][0][0] else h2_state[1]
+            h2_opponent = h2_state[1] if turn[0][0] == h2_state[2][0][0] else h2_state[0]
             
             state = np.stack((player, h1_player, h2_player, opponent, h1_opponent, h2_opponent, turn))
             action_probs.append(curr_action_probs)
@@ -146,27 +171,37 @@ class TTTReplayBuffer():
             states.append(state)
             
         return states, action_probs, values
-    
-class Trainer():
-    def __init__(self, model, device, replay_buffer):
-        self.model = model
-        self.optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
-        self.device = device
-        self.replay_buffer = replay_buffer
-        
-    def train(self, batch_size):
-        states, t_action_probs, t_values = self.replay_buffer.sample(batch_size)
-        
-        states = torch.FloatTensor(np.array(states)).to(self.device)
-        t_action_probs = torch.FloatTensor(np.array(t_action_probs)).to(self.device)
-        t_values = torch.FloatTensor(np.array(t_values)).to(self.device)
-        
-        self.optimizer.zero_grad()
-        p_action_probs, p_values = self.model(states)
-        loss = F.cross_entropy(p_action_probs, t_action_probs) + F.mse_loss(p_values.view(-1), t_values.view(-1))
-        loss.backward()
-        self.optimizer.step()
                    
-                   
+class TTTResNet(nn.Module):
+    def __init__(self, input_channels=7, n_blocks=3, n_channels=32, value_layers=16, n_actions=9):
+        super(TTTResNet, self).__init__()
+        self.conv_init = nn.Conv2d(input_channels, n_channels, kernel_size=3, padding=1, bias=False)
+        self.gn_init = nn.GroupNorm(num_groups=n_channels//8, num_channels=n_channels)
         
+        self.res_blocks = nn.ModuleList([ResBlock(n_channels) for _ in range(n_blocks-1)])
         
+        self.policy_conv = nn.Conv2d(n_channels, 2, kernel_size=1, bias=False)
+        self.policy_gn = nn.GroupNorm(num_groups=1, num_channels=2)
+        self.policy = nn.Linear(2*3*3, n_actions)
+        
+        self.value_conv = nn.Conv2d(n_channels, 1, kernel_size=1, bias=False)
+        self.value_gn = nn.GroupNorm(num_groups=1, num_channels=1)
+        self.value_linear = nn.Linear(1*3*3, value_layers, bias=False)
+        self.value = nn.Linear(value_layers, 1)
+        
+    def forward(self, x):
+        x = F.relu(self.gn_init(self.conv_init(x)))
+        
+        for block in self.res_blocks:
+            x = block(x)
+            
+        policy = F.relu(self.policy_gn(self.policy_conv(x)))
+        policy = policy.view(policy.size(0), -1)
+        policy = self.policy(policy)
+        
+        value = F.relu(self.value_gn(self.value_conv(x)))
+        value = value.view(value.size(0), -1)
+        value = F.relu(self.value_linear(value))
+        value = self.value(value)
+        value = torch.tanh(value)
+        return policy, value
