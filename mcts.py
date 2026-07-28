@@ -1,10 +1,50 @@
 import math
+from abc import ABC, abstractmethod
 
 import numpy as np
 import torch
 
-from game import Game, Outcome
+from game import Game, Outcome, Turn
 from model import ResNet
+
+class BaseMCTSNode(ABC):
+    @abstractmethod
+    def is_leaf(self):
+        pass
+    @abstractmethod
+    def create_node(self, parent, state, prior_prob):
+        pass
+    @abstractmethod
+    def get_model_state(self):
+        pass
+    @property
+    @abstractmethod
+    def parent(self):
+        pass
+    @property
+    @abstractmethod
+    def state(self):
+        pass
+    @property
+    @abstractmethod
+    def children(self):
+        pass
+    @property
+    @abstractmethod
+    def visits(self):
+        pass
+    @property
+    @abstractmethod
+    def t_action_value(self):
+        pass
+    @property
+    @abstractmethod
+    def m_action_value(self):
+        pass
+    @property
+    @abstractmethod
+    def prior_prob(self):
+        pass
 
 class MCTSNode:
     def __init__(self, parent, state: Game, prior_prob: float):
@@ -120,8 +160,6 @@ class MCTS:
                     value = -1
             
             # backprop
-            if node.state.turn != self.root.state.turn:
-                value *= -1
             self.backpropagate(node, value)
         
     def select(self, node):
@@ -133,6 +171,9 @@ class MCTS:
             
             for action, child in node.children.items():
                 q = child.m_action_value
+                
+                if child.state is not None and child.state.turn != node.state.turn:
+                    q = -q
                     
                 u = 1.5 * child.prior_prob * (sqrt_node_visits / (1 + child.visits))
                 value = q + u
@@ -162,18 +203,17 @@ class MCTS:
         valid_indicies = np.where(mask)[0]
         for i in valid_indicies:
             child = node.create_node(node, None, probabilities[i])
-            child.h1_state = node.state
-            child.h2_state = node.h1_state
             node.children[i] = child
         
     def backpropagate(self, node, value):
         while node is not None:
             node.visits += 1
-            if self.root.state.turn == node.state.turn:
-                node.t_action_value += value
-            else:
-                node.t_action_value -= value
+            node.t_action_value += value
             node.m_action_value = node.t_action_value / node.visits
+            
+            if node.parent is not None and node.parent.state is not None:
+                if node.parent.state.turn != node.state.turn:
+                    value = -value
             node = node.parent
             
     def input_move(self, action):
@@ -188,8 +228,6 @@ class TTTMCTSNode:
     def __init__(self, parent, state: Game, prior_prob: float):
         self.parent = parent
         self.state = state
-        self.h1_state = None
-        self.h2_state = None
         self.children = {}
         self.visits = 0
         self.t_action_value = 0
@@ -206,15 +244,5 @@ class TTTMCTSNode:
         curr_state = self.state.get_state()            
         player = curr_state[0]
         opponent = curr_state[1]
-        turn = curr_state[2]
-            
-        h1_state = self.h1_state.get_state() if self.h1_state is not None else [np.zeros((3, 3)), np.zeros((3, 3)), np.zeros((3, 3))]
-        h1_player = h1_state[0] if turn[0][0] == h1_state[2][0][0] else h1_state[1]
-        h1_opponent = h1_state[1] if turn[0][0] == h1_state[2][0][0] else h1_state[0]
-            
-        h2_state = self.h2_state.get_state() if self.h2_state is not None else [np.zeros((3, 3)), np.zeros((3, 3)), np.zeros((3, 3))]
-        h2_player = h2_state[0] if turn[0][0] == h2_state[2][0][0] else h2_state[1]
-        h2_opponent = h2_state[1] if turn[0][0] == h2_state[2][0][0] else h2_state[0]
-            
-        model_state = np.stack((player, h1_player, h2_player, opponent, h1_opponent, h2_opponent, turn))
+        model_state = np.stack((player, opponent))
         return model_state

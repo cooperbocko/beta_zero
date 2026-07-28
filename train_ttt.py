@@ -6,19 +6,20 @@ import torch
 import numpy as np
 
 from model import TTTResNet, TTTReplayBuffer, Trainer
-from tictactoe import TicTacToe, Outcome
+from tictactoe import TicTacToe
 from mcts import TTTMCTSNode, MCTS
+from game import Outcome, Turn
 
 def data_worker(model, device, num_games, worker_id, result_queue):
     for game_num in range(num_games):
         states, probs, values = [], [], []
         game = TicTacToe()
-        mcts = MCTS(model, device, TTTMCTSNode(None, TicTacToe(), 1.0), 200, 1, True)
+        mcts = MCTS(model, device, TTTMCTSNode(None, TicTacToe(), 1.0), 300, 1, True)
         steps = 0
         
         while game.outcome is None: 
-            if game_num % 4 == 0:
-                mcts.temperature = 0
+            #if game_num % 4 == 0:
+                #mcts.temperature = 0.1
                 
             action, v_action_probs = mcts.get_move()
             states.append(game.get_state())
@@ -29,10 +30,10 @@ def data_worker(model, device, num_games, worker_id, result_queue):
             game.step(action)
             steps += 1
             
-        for state in states:
+        for i, state in enumerate(states):
             if game.outcome == Outcome.DRAW:
                 values.append(0)
-            elif (game.outcome == Outcome.X_WIN and state[2][0][0] == 0) or (game.outcome == Outcome.O_WIN and state[2][0][0] == 1):
+            elif (game.outcome == Outcome.WIN_1 and i % 2 == 0) or (game.outcome == Outcome.WIN_2 and i % 2 == 1):
                 values.append(1)
             else:
                 values.append(-1)
@@ -59,7 +60,7 @@ def rotate_data(states, probs, values, k):
             
 def train_tictactoe():
     args = {
-        'num_iterations': 25,
+        'num_iterations': 30,
         'games_per_iteration': 80, 
         'batch_size': 64,
         'num_epochs': 5,
@@ -71,7 +72,7 @@ def train_tictactoe():
         model.load_state_dict(torch.load('temp_checkpoint.pt'))
     model.share_memory()
     replay_buffer = TTTReplayBuffer(max_size=10000)
-    trainer = Trainer(model, args['device'], replay_buffer, lr=0.0001)
+    trainer = Trainer(model, args['device'], replay_buffer, lr=0.00001)
     
     for iteration in range(args['num_iterations']):
         print(f'iteration {iteration}')
@@ -101,6 +102,10 @@ def train_tictactoe():
                 
         for p in processes:
             p.join()
+            
+        #for i in range(10):
+            #random_game = replay_buffer.buffer[random.randint(0, len(replay_buffer.buffer) - 1)]
+            #print(f'game: {random_game}')
         
         print('training')
         model.train()

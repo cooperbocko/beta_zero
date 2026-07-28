@@ -109,7 +109,7 @@ class ReplayBuffer():
 class Trainer():
     def __init__(self, model, device, replay_buffer, lr=0.001, weight_decay=1e-4):
         self.model = model
-        self.optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
+        self.optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
         self.device = device
         self.replay_buffer = replay_buffer
         
@@ -155,17 +155,8 @@ class TTTReplayBuffer():
             
             player = curr_state[0]
             opponent = curr_state[1]
-            turn = curr_state[2]
             
-            h1_state = game[0][start-1] if start-1 >= 0 else [np.zeros((3, 3)), np.zeros((3, 3)), np.zeros((3, 3))]
-            h1_player = h1_state[0] if turn[0][0] == h1_state[2][0][0] else h1_state[1]
-            h1_opponent = h1_state[1] if turn[0][0] == h1_state[2][0][0] else h1_state[0]
-            
-            h2_state = game[0][start-2] if start-2 >= 0 else [np.zeros((3, 3)), np.zeros((3, 3)), np.zeros((3, 3))]
-            h2_player = h2_state[0] if turn[0][0] == h2_state[2][0][0] else h2_state[1]
-            h2_opponent = h2_state[1] if turn[0][0] == h2_state[2][0][0] else h2_state[0]
-            
-            state = np.stack((player, h1_player, h2_player, opponent, h1_opponent, h2_opponent, turn))
+            state = np.stack((player, opponent))
             action_probs.append(curr_action_probs)
             values.append(curr_value)
             states.append(state)
@@ -173,7 +164,7 @@ class TTTReplayBuffer():
         return states, action_probs, values
                    
 class TTTResNet(nn.Module):
-    def __init__(self, input_channels=7, n_blocks=3, n_channels=32, value_layers=16, n_actions=9):
+    def __init__(self, input_channels=2, n_blocks=3, n_channels=32, value_layers=16, n_actions=9):
         super(TTTResNet, self).__init__()
         self.conv_init = nn.Conv2d(input_channels, n_channels, kernel_size=3, padding=1, bias=False)
         self.gn_init = nn.GroupNorm(num_groups=n_channels//8, num_channels=n_channels)

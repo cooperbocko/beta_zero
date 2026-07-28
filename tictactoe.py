@@ -3,11 +3,6 @@ from enum import Enum
 import numpy as np
 
 from game import Game, Turn, Outcome
-
-class Outcome(int, Enum):
-    DRAW = 0
-    X_WIN = 1
-    O_WIN = 2
     
 class Piece(int, Enum):
     EMPTY = 0
@@ -26,6 +21,7 @@ class TicTacToe(Game):
         temp.turn = self.turn
         temp.outcome = self.outcome
         temp.board = np.copy(self.board)
+        temp.n_moves = self.n_moves
         return temp
     
     def step(self, action: int):
@@ -41,19 +37,17 @@ class TicTacToe(Game):
         return True
     
     def move(self, position):
-        self.board[position[0]][position[1]] = self.turn
+        self.board[position[0]][position[1]] = Piece.X if self.turn == Turn.PLAYER_1 else Piece.O
         self.turn = Turn.PLAYER_2 if self.turn == Turn.PLAYER_1 else Turn.PLAYER_1
     
     def get_state(self):
         if self.turn == Turn.PLAYER_1:
             player = (self.board == Piece.X).astype(np.float32)
             opponent = (self.board == Piece.O).astype(np.float32)
-            turn = np.zeros((3, 3))
         else:
             player = (self.board == Piece.O).astype(np.float32)
             opponent = (self.board == Piece.X).astype(np.float32)
-            turn = np.ones((3, 3))
-        return np.stack((player, opponent, turn))
+        return np.stack((player, opponent))
     
     def get_valid_moves(self):
         moves = [0 for _ in range(3 * 3)]
@@ -84,16 +78,16 @@ class TicTacToe(Game):
         piece = self.board[r][c]
         
         if all(self.board[r][i] == piece for i in range(3)):
-            self.outcome = piece
+            self.outcome = Outcome.WIN_1 if piece == Piece.X else Outcome.WIN_2
             return True
         if all(self.board[i][c] == piece for i in range(3)):
-            self.outcome = piece
+            self.outcome = Outcome.WIN_1 if piece == Piece.X else Outcome.WIN_2
             return True
         if r == c and all(self.board[i][i] == piece for i in range(3)):
-            self.outcome = piece
+            self.outcome = Outcome.WIN_1 if piece == Piece.X else Outcome.WIN_2
             return True
         if r + c == 2 and all(self.board[i][2 - i] == piece for i in range(3)):
-            self.outcome = piece
+            self.outcome = Outcome.WIN_1 if piece == Piece.X else Outcome.WIN_2
             return True
         
         return False

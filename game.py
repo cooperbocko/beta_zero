@@ -26,18 +26,3 @@ class Game(ABC):
     @abstractmethod
     def get_valid_moves(self) -> list[int]:
         pass
-    
-    @property
-    @abstractmethod
-    def action_size(self):
-        pass
-    
-    @property
-    @abstractmethod
-    def outcome(self):
-        pass
-    
-    @property
-    @abstractmethod
-    def turn(self):
-        pass
