@@ -31,7 +31,8 @@
 <br />
 <div align="center">
   <a href="https://github.com/cooperbocko/beta_zero">
-    <img src="images/logo.png" alt="Logo" width="80" height="80">
+    <img src="assets/beta.png" alt="Logo" width="80" height="80">
+    <img src="assets/zero.jpeg" alt="Logo" width="80" height="80">
   </a>
 
 <h3 align="center">beta_zero</h3>
