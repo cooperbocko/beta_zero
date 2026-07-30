@@ -5,8 +5,9 @@ import random
 import torch
 import numpy as np
 
-from model import TTTResNet, TTTReplayBuffer, Trainer
-from tictactoe import TicTacToe
+from model import Trainer, ResNet
+from ttt.ttt_model_archive import TTTReplayBuffer
+from ttt.tictactoe import TicTacToe
 from mcts import TTTMCTSNode, MCTS
 from game import Outcome, Turn
 
@@ -18,9 +19,6 @@ def data_worker(model, device, num_games, worker_id, result_queue):
         steps = 0
         
         while game.outcome is None: 
-            #if game_num % 4 == 0:
-                #mcts.temperature = 0.1
-                
             action, v_action_probs = mcts.get_move()
             states.append(game.get_state())
             actual_probs = np.zeros(9)
@@ -67,9 +65,9 @@ def train_tictactoe():
         'device': torch.device('cpu'),
         'num_workers': 8
     }
-    model = TTTResNet().to(args['device'])
-    if os.path.exists('temp_checkpoint.pt'):
-        model.load_state_dict(torch.load('temp_checkpoint.pt'))
+    model = ResNet(2, 3, 32, 16, 9, 3*3).to(args['device'])
+    if os.path.exists('models/ttt_temp_checkpoint.pt'):
+        model.load_state_dict(torch.load('models/ttt_temp_checkpoint.pt'))
     model.share_memory()
     replay_buffer = TTTReplayBuffer(max_size=10000)
     trainer = Trainer(model, args['device'], replay_buffer, lr=0.00001)
@@ -102,10 +100,6 @@ def train_tictactoe():
                 
         for p in processes:
             p.join()
-            
-        #for i in range(10):
-            #random_game = replay_buffer.buffer[random.randint(0, len(replay_buffer.buffer) - 1)]
-            #print(f'game: {random_game}')
         
         print('training')
         model.train()
@@ -118,7 +112,7 @@ def train_tictactoe():
             avg_loss = epoch_loss / batches_per_epoch
             print(f'epoch {epoch} loss: {avg_loss}')
                 
-        torch.save(model.state_dict(), 'temp_checkpoint.pt')
+        torch.save(model.state_dict(), 'models/ttt_temp_checkpoint.pt')
         print('model saved')
 
 if __name__ == "__main__":
