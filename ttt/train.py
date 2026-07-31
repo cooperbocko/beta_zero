@@ -8,7 +8,8 @@ import numpy as np
 from model import Trainer, ResNet
 from ttt.ttt_model_archive import TTTReplayBuffer
 from ttt.tictactoe import TicTacToe
-from mcts import TTTMCTSNode, MCTS
+from mcts import MCTS
+from ttt.ttt_mcts_node import TTTMCTSNode
 from game import Outcome, Turn
 
 def data_worker(model, device, num_games, worker_id, result_queue):
