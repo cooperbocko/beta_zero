@@ -2,7 +2,7 @@ import numpy as np
 
 from game import Game
 
-class TTTMCTSNode:
+class C4MCTSNode:
     def __init__(self, parent, state: Game, prior_prob: float):
         self.parent = parent
         self.state = state

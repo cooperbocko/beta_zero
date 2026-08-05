@@ -49,7 +49,15 @@ class Connect4(Game):
         return (r, action)
     
     def get_state(self):
-        pass
+        player = np.zeros((6, 7))
+        opponent = np.zeros((6, 7))
+        if self.turn == Turn.PLAYER_1:
+            player = (self.board == Piece.X).astype(np.float32)
+            opponent = (self.board == Piece.O).astype(np.float32)
+        else:
+            player = (self.board == Piece.O).astype(np.float32)
+            opponent = (self.board == Piece.X).astype(np.float32)
+        return np.stack([player, opponent])
     
     def get_valid_moves(self):
         moves = [0 for _ in range(7)]
@@ -111,7 +119,7 @@ class Connect4(Game):
         while r_temp < 6 and c_temp < 7 and self.board[r_temp][c_temp] == piece:
             r_temp += 1
             c_temp += 1
-            up_diag += 1
+            down_diag += 1
         if down_diag >= 4:
             self.outcome = Outcome.WIN_1 if piece == Piece.X else Outcome.WIN_2
             return True
