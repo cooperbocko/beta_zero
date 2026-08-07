@@ -16,7 +16,7 @@ def data_worker(model, device, num_games, result_queue):
     for game_n in range(num_games):
         states, probs, values = [], [], []
         game = Connect4()
-        mcts = MCTS(model, device, C4MCTSNode(None, Connect4(), 1.0), 10, 1, True)
+        mcts = MCTS(model, device, C4MCTSNode(None, Connect4(), 1.0), 300, 1, True)
         
         while game.outcome is None:
             action, v_action_probs = mcts.get_move()
@@ -66,7 +66,7 @@ def train_c4():
         games_added = 0
         print('collecting data')
         
-        games_per_iteration = 100
+        games_per_iteration = 80
         games_per_worker = games_per_iteration // 8
         with mp.Manager() as manager:
             result_queue = manager.Queue()

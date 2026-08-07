@@ -142,3 +142,111 @@ class Connect4(Game):
             return True
         
         return False
+    
+class Connect4BitBoard():
+    '''
+    Bitboard representation
+    
+    0 | 0 | 0 | 0 | 0 | 0 | 0
+    05| 12| 19| 26| 33| 40| 47
+    04| 11| 18| 25| 32| 39| 46
+    03| 10| 17| 24| 31| 38| 45
+    02| 09| 16| 23| 30| 37| 44
+    01| 08| 15| 22| 29| 36| 43
+    00| 07| 14| 21| 28| 35| 42
+    
+    Bottom mask: 1's at 0, 7, 14, 21, 28, 35, 42
+    '''
+    
+    def __init__(self):
+        self.position = 0
+        self.mask = 0
+        self.bottom_mask = 0x40810204081
+        self.top_mask = 0x810204081020
+        self.turn = Turn.PLAYER_1
+        self.outcome = None
+        
+    def step(self, action: int):
+        if self.outcome is not None:
+            return
+        
+        self.move(action)
+        if self.check_win() or self.check_draw():
+            return
+        
+        self.switch_player()
+        return True
+        
+    def move(self, column):
+        bottom_bit = 1 << (column * 7)
+        old_mask = self.mask
+        self.mask |= (bottom_bit + self.mask)
+        new_bit = old_mask ^ self.mask
+        self.position |= new_bit
+        
+    def print_board(self):
+        for i in range(5, -1, -1):
+            for j in range(7):
+                if self.position & (1 << (j * 7 + i)):
+                    if self.turn == Turn.PLAYER_1:
+                        print("X", end = " ")
+                    else:
+                        print("O", end = " ")
+                elif self.mask & (1 << (j * 7 + i)):
+                    if self.turn == Turn.PLAYER_1:
+                        print("O", end = " ")
+                    else:
+                        print("X", end = " ")
+                else:
+                    print("-", end = " ")
+            print()
+    
+    def switch_player(self):
+        self.position ^= self.mask
+        self.turn = Turn.PLAYER_2 if self.turn == Turn.PLAYER_1 else Turn.PLAYER_1
+        
+    def get_valid_moves(self):
+        return [0 if self.mask & (1 << (5 + (i * 7))) else 1 for i in range(7)]
+    
+    def check_draw(self):
+        if (self.mask & self.top_mask) == self.top_mask:
+            self.outcome = Outcome.DRAW
+            return True
+        return False
+    
+    def check_win(self):
+        #vertical
+        two_in_a_row = self.position & self.position << 1
+        two_in_a_row = two_in_a_row & self.mask
+        four_in_a_row = two_in_a_row & two_in_a_row << 2
+        if four_in_a_row:
+            self.outcome = Outcome.WIN_1 if self.turn == Turn.PLAYER_1 else Outcome.WIN_2
+            return True
+        
+        #(((self.position & self.position << 1) & self.mask) & (((self.position & self.position << 1) & self.mask) << 2))
+        
+        #horizontal
+        two_in_a_row = self.position & self.position << 7
+        two_in_a_row = two_in_a_row & self.mask
+        four_in_a_row = two_in_a_row & two_in_a_row << 14 
+        if four_in_a_row:
+            self.outcome = Outcome.WIN_1 if self.turn == Turn.PLAYER_1 else Outcome.WIN_2
+            return True
+        
+        #down diagonal
+        two_in_a_row = self.position & self.position << 6
+        two_in_a_row = two_in_a_row & self.mask
+        four_in_a_row = two_in_a_row & two_in_a_row << 12
+        if four_in_a_row:
+            self.outcome = Outcome.WIN_1 if self.turn == Turn.PLAYER_1 else Outcome.WIN_2
+            return True
+        
+        #up diagonal
+        two_in_a_row = self.position & self.position << 8
+        two_in_a_row = two_in_a_row & self.mask
+        four_in_a_row = two_in_a_row & two_in_a_row << 16
+        if four_in_a_row:
+            self.outcome = Outcome.WIN_1 if self.turn == Turn.PLAYER_1 else Outcome.WIN_2
+            return True
+        
+        return False

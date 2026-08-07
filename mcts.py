@@ -6,86 +6,6 @@ import torch
 
 from game import Game, Outcome, Turn
 from model import ResNet
-
-class BaseMCTSNode(ABC):
-    @abstractmethod
-    def is_leaf(self):
-        pass
-    @abstractmethod
-    def create_node(self, parent, state, prior_prob):
-        pass
-    @abstractmethod
-    def get_model_state(self):
-        pass
-    @property
-    @abstractmethod
-    def parent(self):
-        pass
-    @property
-    @abstractmethod
-    def state(self):
-        pass
-    @property
-    @abstractmethod
-    def children(self):
-        pass
-    @property
-    @abstractmethod
-    def visits(self):
-        pass
-    @property
-    @abstractmethod
-    def t_action_value(self):
-        pass
-    @property
-    @abstractmethod
-    def m_action_value(self):
-        pass
-    @property
-    @abstractmethod
-    def prior_prob(self):
-        pass
-
-class MCTSNode:
-    def __init__(self, parent, state: Game, prior_prob: float):
-        self.parent = parent
-        self.state = state
-        self.h1_state = None
-        self.h2_state = None
-        self.children = {}
-        self.visits = 0
-        self.t_action_value = 0
-        self.m_action_value = 0
-        self.prior_prob = prior_prob
-        
-    def is_leaf(self):
-        return len(self.children) == 0
-    
-    def create_node(self, parent, state, prior_prob):
-        return type(self)(parent, state, prior_prob)
-    
-    def get_model_state(self):
-        curr_state = self.state.get_state()            
-        player = curr_state[0]
-        opponent = curr_state[1]
-        player_k = curr_state[2]
-        opponent_k = curr_state[3]
-        turn = curr_state[4]
-            
-        h1_state = self.h1_state.get_state() if self.h1_state is not None else [np.zeros((8, 8)), np.zeros((8, 8)), np.zeros((8, 8)), np.zeros((8, 8)), np.zeros((8, 8))]
-        h1_player = h1_state[0] if turn[0][0] == h1_state[4][0][0] else np.flip(h1_state[1])
-        h1_opponent = h1_state[1] if turn[0][0] == h1_state[4][0][0] else np.flip(h1_state[0])
-        h1_player_k = h1_state[2] if turn[0][0] == h1_state[4][0][0] else np.flip(h1_state[3])
-        h1_opponent_k = h1_state[3] if turn[0][0] == h1_state[4][0][0] else np.flip(h1_state[2])
-            
-        h2_state = self.h2_state.get_state() if self.h2_state is not None else [np.zeros((8, 8)), np.zeros((8, 8)), np.zeros((8, 8)), np.zeros((8, 8)), np.zeros((8, 8))]
-        h2_player = h2_state[0] if turn[0][0] == h2_state[4][0][0] else np.flip(h2_state[1])
-        h2_opponent = h2_state[1] if turn[0][0] == h2_state[4][0][0] else np.flip(h2_state[0])
-        h2_player_k = h2_state[2] if turn[0][0] == h2_state[4][0][0] else np.flip(h2_state[3])
-        h2_opponent_k = h2_state[3] if turn[0][0] == h2_state[4][0][0] else np.flip(h2_state[2])
-            
-        model_state = np.stack((player, h1_player, h2_player, opponent, h1_opponent, h2_opponent, player_k, h1_player_k, h2_player_k, opponent_k, h1_opponent_k, h2_opponent_k, turn))
-        return model_state
         
 class MCTS:
     def __init__(self, model: ResNet, device, root, iterations: int, temperature: float = 1.0, is_training: bool = True):
@@ -222,3 +142,24 @@ class MCTS:
             child.state = child.parent.state.copy()
             child.state.step(action)
         self.root = child
+        
+        
+class MCTSNode:
+    def __init__(self, parent, state: Game, prior_prob: float):
+        self.parent = parent
+        self.state = state
+        self.children = {}
+        self.visits = 0
+        self.t_action_value = 0
+        self.m_action_value = 0
+        self.prior_prob = prior_prob
+        
+    def is_leaf(self):
+        return len(self.children) == 0
+    
+    def create_node(self, parent, state, prior_prob):
+        return type(self)(parent, state, prior_prob)
+    
+    @abstractmethod
+    def get_model_state(self):
+        pass
