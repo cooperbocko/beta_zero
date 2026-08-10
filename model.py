@@ -1,10 +1,12 @@
 import random
+import time
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import torch.multiprocessing as mp
 
 class ResBlock(nn.Module):
     def __init__(self, channels=128):
@@ -128,3 +130,59 @@ class Trainer():
         self.optimizer.step()
         
         return loss.item()
+    
+class InferenceServer(mp):
+    def __init__(self, model, model_path, device, request_queue, batch_size=64, timeout=0.002):
+        super().__init__()
+        self.model = model
+        self.model_path = model_path
+        self.device = device
+        self.request_queue = request_queue
+        self.batch_size = batch_size
+        self.timeout = timeout
+        
+    def reload(self):
+        self.model.load_state_dict(torch.load(self.model_path))
+        self.model.to(self.device)
+        self.model.eval()
+        
+    def run(self):
+        self.model.load_state_dict(torch.load(self.model_path))
+        self.model.to(self.device)
+        self.model.eval()
+        print("Inference server started")
+        
+        while True:
+            batch = []
+            start_time = time.perf_counter()
+            
+            first_request = self.request_queue.get()
+            if first_request is None:
+                break
+            
+            batch.append(first_request)
+            while len(batch) < self.batch_size:
+                elapsed_time = time.perf_counter() - start_time
+                if elapsed_time > self.timeout:
+                    break
+                
+                try: 
+                    request = self.request_queue.get_nowait()
+                    if request is None:
+                        break
+                    batch.append(request)
+                except mp.queues.Empty:
+                    time.sleep(0.0001)
+                    
+            #request = id, state, pipe
+            states = np.stack([request[1] for request in batch])
+            batch_tensor = torch.from_numpy(states).float().to(self.device, non_blocking=True)
+            
+            with torch.no_grad():
+                policies, values = self.model(batch_tensor)
+                probs = torch.softmax(policies, dim=-1).cpu().numpy()
+                values = values.cpu().numpy()
+                
+            for index, (_, _, pipe) in enumerate(batch):
+                pipe.send((probs[index], values[index][0]))
+                

@@ -10,18 +10,22 @@ from game import Outcome, Turn
 from mcts import MCTS
 from c4.c4_mcts_node import C4MCTSNode
 from c4.c4_replay_buffer import C4ReplayBuffer
-from c4.connect4 import Connect4
+from c4.connect4 import Connect4, Connect4BitBoard
 
-def data_worker(model, device, num_games, result_queue):
+def data_worker(device, num_games, result_queue):
     for game_n in range(num_games):
         states, probs, values = [], [], []
-        game = Connect4()
-        mcts = MCTS(model, device, C4MCTSNode(None, Connect4(), 1.0), 300, 1, True)
+        game = Connect4BitBoard()
+        model = ResNet(input_channels=2, n_blocks=5, n_channels=64, value_layers=32, n_actions=7, board_size=6*7)
+        if os.path.exists('c4_temp_checkpoint.pt'):
+            model.load_state_dict(torch.load('c4_temp_checkpoint.pt'))
+        model.to(device)
+        mcts = MCTS(model, device, C4MCTSNode(None, Connect4BitBoard(), 1.0), 1, 1, True)
         
         while game.outcome is None:
             action, v_action_probs = mcts.get_move()
             states.append(game.get_state())
-            actual_probs = np.zeros(49)
+            actual_probs = np.zeros(7)
             for v_action, prob in v_action_probs.items():
                 actual_probs[v_action] = prob
             probs.append(actual_probs)
@@ -53,7 +57,7 @@ def flip_data(states, probs):
 
 def train_c4():
     model = ResNet(input_channels=2, n_blocks=5, n_channels=64, value_layers=32, n_actions=7, board_size=6*7)
-    device = torch.device('cpu')
+    device = torch.device('mps')
     model.to(device)
     if os.path.exists('c4_temp_checkpoint.pt'):
         model.load_state_dict(torch.load('c4_temp_checkpoint.pt'))
@@ -73,7 +77,7 @@ def train_c4():
             processes = []
             
             for worker_id in range(8):
-                p = mp.Process(target=data_worker, args=(model, device, games_per_worker, result_queue))
+                p = mp.Process(target=data_worker, args=(device, games_per_worker, result_queue))
                 p.start()
                 processes.append(p)
                 

@@ -16,7 +16,7 @@ def data_worker(model, device, num_games, worker_id, result_queue):
     for game_num in range(num_games):
         states, probs, values = [], [], []
         game = TicTacToe()
-        mcts = MCTS(model, device, TTTMCTSNode(None, TicTacToe(), 1.0), 300, 1, True)
+        mcts = MCTS(model, device, TTTMCTSNode(None, TicTacToe(), 1.0), 100, 1, True)
         steps = 0
         
         while game.outcome is None: 

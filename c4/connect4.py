@@ -144,9 +144,10 @@ class Connect4(Game):
         return False
     
 class Connect4BitBoard():
+    BOTTOM_MASK = 0x40810204081
+    TOP_MASK = 0x810204081020
     '''
     Bitboard representation
-    
     0 | 0 | 0 | 0 | 0 | 0 | 0
     05| 12| 19| 26| 33| 40| 47
     04| 11| 18| 25| 32| 39| 46
@@ -154,15 +155,10 @@ class Connect4BitBoard():
     02| 09| 16| 23| 30| 37| 44
     01| 08| 15| 22| 29| 36| 43
     00| 07| 14| 21| 28| 35| 42
-    
-    Bottom mask: 1's at 0, 7, 14, 21, 28, 35, 42
     '''
-    
     def __init__(self):
         self.position = 0
         self.mask = 0
-        self.bottom_mask = 0x40810204081
-        self.top_mask = 0x810204081020
         self.turn = Turn.PLAYER_1
         self.outcome = None
         
@@ -176,6 +172,26 @@ class Connect4BitBoard():
         
         self.switch_player()
         return True
+    
+    def copy(self):
+        temp = Connect4BitBoard()
+        temp.position = self.position
+        temp.mask = self.mask
+        temp.turn = self.turn
+        temp.outcome = self.outcome
+        return temp
+    
+    def get_state(self):
+        player = np.zeros((6, 7))
+        opponent = np.zeros((6, 7))
+        
+        for i in range(5, -1, -1):
+            for j in range(7):
+                if self.position & (1 << (j * 7 + i)):
+                    player[i][j] = 1
+                elif self.mask & (1 << (j * 7 + i)):
+                    opponent[i][j] = 1
+        return np.stack([player, opponent])
         
     def move(self, column):
         bottom_bit = 1 << (column * 7)
@@ -209,7 +225,7 @@ class Connect4BitBoard():
         return [0 if self.mask & (1 << (5 + (i * 7))) else 1 for i in range(7)]
     
     def check_draw(self):
-        if (self.mask & self.top_mask) == self.top_mask:
+        if (self.mask & Connect4BitBoard.TOP_MASK) == Connect4BitBoard.TOP_MASK:
             self.outcome = Outcome.DRAW
             return True
         return False

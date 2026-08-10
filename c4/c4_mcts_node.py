@@ -8,8 +8,4 @@ class C4MCTSNode(MCTSNode):
         super().__init__(parent, state, prior_prob)
         
     def get_model_state(self):
-        curr_state = self.state.get_state()            
-        player = curr_state[0]
-        opponent = curr_state[1]
-        model_state = np.stack((player, opponent))
-        return model_state
+        return self.state.get_state()
