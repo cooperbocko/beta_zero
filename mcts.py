@@ -2,10 +2,8 @@ import math
 from abc import ABC, abstractmethod
 
 import numpy as np
-import torch
 
-from game import Game, Outcome
-from model import ResNet
+from game import Game
 
 class MCTSNode:
     def __init__(self, state: Game, prior_prob: float):
@@ -27,12 +25,11 @@ class MCTSNode:
         pass
         
 class MCTS:
-    def __init__(self, root, iterations: int, temperature: float = 1.0, is_training: bool = True):
+    def __init__(self, root, temperature: float = 1.0, is_training: bool = True):
         self.root = root
         self.temperature = temperature
-        self.iterations = iterations
         self.is_training = is_training
-        self.seen_states = set() # for shared nodes
+        self.seen_states = {} # for shared nodes
         
     def get_move(self) -> tuple[int, dict[int, float]]:
         actions = list(self.root.children.keys())
@@ -53,7 +50,8 @@ class MCTS:
         
         return action, action_probs
         
-    def select(self, node: MCTSNode) -> tuple[MCTSNode, list[MCTSNode]]:
+    def select(self) -> tuple[MCTSNode, list[MCTSNode]]:
+        node = self.root
         path = [node]
         while not node.is_leaf():
             argmax = float('-inf')
@@ -78,7 +76,7 @@ class MCTS:
             node = best_node
             path.append(node)
             
-        #Step the game and cache the state
+        #step the game and cache the state
         if node is not self.root and node.state is None:
             parent = path[-2]
             node.state = parent.state.copy()

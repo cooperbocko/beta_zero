@@ -192,6 +192,9 @@ class Connect4BitBoard():
                 elif self.mask & (1 << (j * 7 + i)):
                     opponent[i][j] = 1
         return np.stack([player, opponent])
+    
+    def get_cache_state(self):
+        return self.position + (self.mask + Connect4BitBoard.BOTTOM_MASK)
         
     def move(self, column):
         bottom_bit = 1 << (column * 7)
