@@ -29,17 +29,7 @@ def request_inference(request_queue: queue.Queue, state: np.ndarray):
     
     return future.result()
 
-def inference_loop(model: ResNet, request_queue: queue.Queue, device: torch.device, batch_size: int):
-    start_time = time.monotonic()
-    total = 0
-    n_batches = 0
-    idle_time = 0
-    batch_wait_time = 0
-    input_transfer_time = 0
-    inference_time = 0
-    output_transfer_time = 0
-    future_time = 0
-    
+def inference_loop(model: ResNet, request_queue: queue.Queue, device: torch.device, batch_size: int):    
     while True:
         idle_start = time.monotonic()
         request = request_queue.get()
@@ -48,7 +38,6 @@ def inference_loop(model: ResNet, request_queue: queue.Queue, device: torch.devi
         if request is None:
             break
         
-        batch_start = time.monotonic()
         batch = [request]
         deadline = time.monotonic() + 0.001
         while len(batch) < batch_size:
@@ -61,46 +50,21 @@ def inference_loop(model: ResNet, request_queue: queue.Queue, device: torch.devi
                 batch.append(request)
             except queue.Empty:
                 break
-        batch_wait_time += time.monotonic() - batch_start
-        
-        input_start = time.monotonic()
+            
         model_states = np.stack([request.state for request in batch])
         state_tensors = torch.from_numpy(model_states).float()
         state_tensors = state_tensors.to(device)
-        input_transfer_time += time.monotonic() - input_start
-        
-        inf_start = time.monotonic()
-        torch.mps.synchronize()
+
         with torch.no_grad():
             probs, values = model(state_tensors)
-        torch.mps.synchronize()
-        inference_time += time.monotonic() - inf_start
         
-        output_start = time.monotonic()
         probs = probs.detach().cpu().numpy()
         values = values.detach().cpu().numpy()
-        output_transfer_time += time.monotonic() - output_start
             
-        dispatch_start = time.monotonic()
         for request, prob, value in zip(batch, probs, values):
             request.future.set_result((prob, value))
-        future_time += time.monotonic() - dispatch_start
-            
-        total += len(batch)
-        n_batches += 1
-    
-    print(f'total time running: {start_time - time.monotonic()}')
-    print(f'inference loop completed {total} requests in {n_batches} batches')
-    print(f'avg requests per batch: {total / n_batches}')
-    print(f'batch_time: {batch_wait_time}')
-    print(f'idle time: {idle_time}')
-    print(f'input time: {input_transfer_time}')
-    print(f'total inference time: {inference_time}')
-    print(f'output time: {output_transfer_time}')
-    print(f'future time: {future_time}')
             
 def process_worker(n_threads: int, batch_size: int, n_games: int, n_iterations: int):
-    start = time.time()
     result_queue = queue.Queue()
     stop_event = threading.Event()
     
@@ -116,9 +80,10 @@ def process_worker(n_threads: int, batch_size: int, n_games: int, n_iterations: 
     inference_thread.start()
     
     #game threads
+    t_table = {} # [state] : (probs, value)
     threads = []
     for _ in range(n_threads):
-        t = threading.Thread(target=play_game, args=(result_queue, inference_queue, n_iterations, stop_event))
+        t = threading.Thread(target=play_game, args=(result_queue, inference_queue, n_iterations, stop_event, t_table))
         t.start()
         threads.append(t)
         
@@ -135,7 +100,8 @@ def process_worker(n_threads: int, batch_size: int, n_games: int, n_iterations: 
     inference_queue.put(None)
     inference_thread.join()
 
-def play_game(result_queue: queue.Queue, inference_queue: queue.Queue, n_iterations: int, stop_event: threading.Event):
+def play_game(result_queue: queue.Queue, inference_queue: queue.Queue, n_iterations: int, stop_event: threading.Event, t_table):
+    t_table = t_table
     while not stop_event.is_set():
         c4 = Connect4BitBoard()
         mcts = MCTS(C4MCTSNode(Connect4BitBoard(), 1), 1, True)
@@ -157,8 +123,13 @@ def play_game(result_queue: queue.Queue, inference_queue: queue.Queue, n_iterati
                         value = 1
                     else:
                         value = -1
-                else:   
-                    probs, value = request_inference(inference_queue, node.state.get_state())
+                else:
+                    # look at t table
+                    if node.state.get_state() in t_table:
+                        probs, value = t_table[node.state.get_state()]
+                    else:   
+                        probs, value = request_inference(inference_queue, node.state.get_state())
+                        t_table[node.state.get_state()] = (probs, value)
                         
                     mcts.expand(node, probs)
                 mcts.backpropagate(path, value)
@@ -267,7 +238,6 @@ if __name__ == "__main__":
                     
     print(f'64 threads, 16 batch time: {time.time() - time1}')
     
-    
 def data_worker():
     pass
 def train_c4():
@@ -321,5 +291,3 @@ def train_c4():
             
         torch.save(model.state_dict(), 'c4_temp_checkpoint.pt')
         print('model saved')
-
-        

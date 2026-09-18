@@ -1,6 +1,9 @@
+import threading
+
 class TranspositionTable():
     def __init__(self):
-        self.table = {} # key = state, value = (probs, value, model_age)
+        self.lock = threading.Lock()
+        self.table = {} # key = state, value = (probs, value)
         
     def add(self, state, probs, value):        
         self.table[state] = (probs, value)
