@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from game import Game
+from game import Game, Outcome
 
 class MCTSNode:
     def __init__(self, state: Game, prior_prob: float):
@@ -136,4 +136,14 @@ class MCTS:
                 for i, action in enumerate(actions):
                     p = self.root.children[action].prior_prob
                     self.root.children[action].prior_prob = p * (1 - epsilon) + noise[i] * epsilon
+
+    def get_terminal_value(self, node: MCTSNode) -> int:
+        if node.state.outcome is None:
+            return None
+        elif node.state.outcome == Outcome.DRAW:
+            return 0
+        elif node.state.outcome == self.root.state.turn:
+            return 1
+        else:
+            return -1
         
