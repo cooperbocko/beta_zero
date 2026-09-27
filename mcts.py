@@ -122,7 +122,7 @@ class MCTS:
     def input_move(self, action):
         child = self.root.children[action]
         if child.state is None:
-            child.state = child.parent.state.copy()
+            child.state = self.root.state.copy()
             child.state.step(action)
         self.root = child
         
