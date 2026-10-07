@@ -120,19 +120,23 @@ class MCTS:
                     value = -value
             
     def input_move(self, action):
-        child = self.root.children[action]
-        if child.state is None:
+        child = self.root.children.get(action)
+
+        if child is None:
+            child = self.root.create_node(None, 1)
+            child.state = self.root.state.copy()
+            child.state.step(action)
+        elif child.state is None:
             child.state = self.root.state.copy()
             child.state.step(action)
         self.root = child
         
-    def add_dirlect_noise(self):
+    def add_dirichlet_noise(self, epsilon: float = 0.25, alpha: float = 1.0): 
         if self.is_training and self.root.children:
             actions = list(self.root.children.keys())
             n_actions = len(actions)
             if n_actions > 0:
-                noise = np.random.dirichlet([0.3] * n_actions)
-                epsilon = 0.25
+                noise = np.random.dirichlet([alpha] * n_actions)
                 for i, action in enumerate(actions):
                     p = self.root.children[action].prior_prob
                     self.root.children[action].prior_prob = p * (1 - epsilon) + noise[i] * epsilon

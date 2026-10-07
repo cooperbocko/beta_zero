@@ -13,7 +13,6 @@ from c4.c4_replay_buffer import C4ReplayBuffer
 from c4.connect4 import Connect4BitBoard
 
 def data_worker(id, data_queue, n_games, iterations):
-    print(f'worker {id} started')
     device = torch.device('cpu')
     torch.set_num_threads(1)
     games = []
@@ -23,16 +22,30 @@ def data_worker(id, data_queue, n_games, iterations):
     model.to(device)
     
     for _ in range(n_games):
-        print(f'worker {id} game {len(games)} started')
         c4 = Connect4BitBoard()
         mcts = MCTS(C4MCTSNode(Connect4BitBoard(), 1), 1, True)
         state_list = []
         probs_list = []
         value_list = []
+        moves = 0
+
+        # inital root expansion
+        node, path = mcts.select()
+        state = torch.from_numpy(node.state.get_state()).float().to(device)
+        state = state.unsqueeze(0)
+        with torch.no_grad():
+            probs, value = model(state)
+        probs = probs.detach().cpu().numpy()[0]
+        value = value.detach().cpu().numpy()[0]
+        mcts.expand(node, probs)
 
         while c4.outcome is None:
+            # temperature check
+            if moves > 12 and mcts.temperature >= 0.5:
+                mcts.temperature = 0.1
+
             # noise
-            mcts.add_dirlect_noise()
+            mcts.add_dirichlet_noise(0.25, 1.0)
 
             # iterations
             for _ in range(iterations):
@@ -67,6 +80,7 @@ def data_worker(id, data_queue, n_games, iterations):
             state_list.append(c4.get_state())
             probs_list.append(actual_probs)
             c4.step(action)
+            moves += 1
 
         # get values
         for i, _ in enumerate(state_list):
@@ -96,9 +110,6 @@ def flip_data(states, probs):
         f_probs.append(f_prob.flatten().copy())
         
     return (f_states, f_probs)
-
-def load_latest():
-    pass
 
 def save_model(model, optimizer, iteration, path):
     checkpoint = {
@@ -173,10 +184,11 @@ def train_c4(args=None):
                 replay_buffer.add(states, action_probs, rewards)
 
         # mini batches
+        t_loss = 0
         for _ in range(mini_batches):
-            loss = trainer.train(batch_size)
-            print(f'loss: {loss}')
+            t_loss += trainer.train(batch_size)
 
+        print(f'iteration: {model_iteration} avg loss: {t_loss / mini_batches} total loss: {t_loss}')
         model_iteration += 1
         save_model(model, trainer.optimizer, model_iteration, './c4/models/')
 
