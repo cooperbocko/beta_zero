@@ -26,3 +26,7 @@ class Game(ABC):
     @abstractmethod
     def get_valid_moves(self) -> list[int]:
         pass
+    
+    @abstractmethod
+    def get_cache_state(self):
+        pass

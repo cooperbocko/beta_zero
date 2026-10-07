@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import torch.multiprocessing as mp
 
 class ResBlock(nn.Module):
     def __init__(self, channels=128):
@@ -128,3 +129,4 @@ class Trainer():
         self.optimizer.step()
         
         return loss.item()
+                
