@@ -1,11 +1,11 @@
 import math
-from abc import ABC, abstractmethod
 
 import numpy as np
 
 from game import Game, Outcome
+from model import ResNet
 
-class MCTSNode:
+class MCTSNode():
     def __init__(self, state: Game, prior_prob: float):
         self.state = state
         self.children = {}
@@ -19,10 +19,6 @@ class MCTSNode:
     
     def create_node(self, state, prior_prob):
         return type(self)(state, prior_prob)
-    
-    @abstractmethod
-    def get_model_state(self):
-        pass
         
 class MCTS:
     def __init__(self, root, temperature: float = 1.0, is_training: bool = True):
@@ -46,7 +42,6 @@ class MCTS:
         action = np.random.choice(actions, p=probs)
         action_probs = {actions[i]: probs[i] for i in range(len(actions))}
         self.root = self.root.children[action]
-        self.root.parent = None
         
         return action, action_probs
         
@@ -150,4 +145,7 @@ class MCTS:
             return 1
         else:
             return -1
+
+    def mcts_iteration(self, model: ResNet):
+        pass
         

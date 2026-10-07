@@ -2,7 +2,6 @@ import random
 
 import numpy as np
 
-
 class C4ReplayBuffer():
     def __init__(self, max_size=10000):
         self.buffer = []
