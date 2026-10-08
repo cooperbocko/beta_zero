@@ -5,10 +5,9 @@ import os
 import torch
 import numpy as np
 
-from model import Trainer, ResNet
+from model import Trainer, ResNet, ReplayBuffer
 from game import Outcome
-from mcts import MCTS
-from c4.c4_mcts_node import C4MCTSNode
+from mcts import MCTS, MCTSNode
 from c4.c4_replay_buffer import C4ReplayBuffer
 from c4.connect4 import Connect4BitBoard
 
@@ -23,7 +22,7 @@ def data_worker(id, data_queue, n_games, iterations):
     
     for _ in range(n_games):
         c4 = Connect4BitBoard()
-        mcts = MCTS(C4MCTSNode(Connect4BitBoard(), 1), 1, True)
+        mcts = MCTS(MCTSNode(Connect4BitBoard(), 1), 1, True)
         state_list = []
         probs_list = []
         value_list = []

@@ -6,7 +6,7 @@ import torch
 import numpy as np
 
 from model import Trainer, ResNet
-from ttt.ttt_model_archive import TTTReplayBuffer
+from ttt.ttt_replay_buffer import TTTReplayBuffer
 from ttt.tictactoe import TicTacToe
 from mcts import MCTS
 from ttt.ttt_mcts_node import TTTMCTSNode

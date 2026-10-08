@@ -1,6 +1,7 @@
 import math
 
 import numpy as np
+import torch
 
 from game import Game, Outcome
 from model import ResNet
@@ -21,11 +22,12 @@ class MCTSNode():
         return type(self)(state, prior_prob)
         
 class MCTS:
-    def __init__(self, root, temperature: float = 1.0, is_training: bool = True):
+    def __init__(self, root: MCTSNode, temperature: float = 1.0, epsilon: float = 0.25, alpha: float = 1.0):
         self.root = root
         self.temperature = temperature
-        self.is_training = is_training
         self.seen_states = {} # for shared nodes
+        self.epsilon = epsilon
+        self.alpha = alpha
         
     def get_move(self) -> tuple[int, dict[int, float]]:
         actions = list(self.root.children.keys())
@@ -126,15 +128,15 @@ class MCTS:
             child.state.step(action)
         self.root = child
         
-    def add_dirichlet_noise(self, epsilon: float = 0.25, alpha: float = 1.0): 
-        if self.is_training and self.root.children:
+    def add_dirichlet_noise(self): 
+        if self.root.children:
             actions = list(self.root.children.keys())
             n_actions = len(actions)
             if n_actions > 0:
-                noise = np.random.dirichlet([alpha] * n_actions)
+                noise = np.random.dirichlet([self.alpha] * n_actions)
                 for i, action in enumerate(actions):
                     p = self.root.children[action].prior_prob
-                    self.root.children[action].prior_prob = p * (1 - epsilon) + noise[i] * epsilon
+                    self.root.children[action].prior_prob = p * (1 - self.epsilon) + noise[i] * self.epsilon
 
     def get_terminal_value(self, node: MCTSNode) -> int:
         if node.state.outcome is None:
@@ -146,6 +148,27 @@ class MCTS:
         else:
             return -1
 
-    def mcts_iteration(self, model: ResNet):
-        pass
+    def iteration(self, model: ResNet, device: torch.device):
+        # select
+        node, path = self.select()
+
+        # check if terminal
+        value = self.get_terminal_value(node)
+        if value:
+            self.backpropagate(path, value)
+            return
+
+        # get action and probs
+        state = torch.from_numpy(node.state.get_state()).float().to(device)
+        state = state.unsqueeze(0)
+        with torch.no_grad():
+            probs, value = model(state)
+        probs = probs.detach().cpu().numpy()[0]
+        value = value.detach().cpu().numpy()[0]
+
+        # expand
+        self.expand(node, probs)
+
+        # backpropagate
+        self.backpropagate(path, value)
         

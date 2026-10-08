@@ -11,8 +11,7 @@ class Piece(int, Enum):
 
 class TicTacToe(Game):
     def __init__(self):
-        self.turn = Turn.PLAYER_1
-        self.outcome = None
+        super().__init__()
         self.n_moves = 0
         self.board = np.zeros((3, 3), dtype=np.int8)
         
@@ -23,6 +22,15 @@ class TicTacToe(Game):
         temp.board = np.copy(self.board)
         temp.n_moves = self.n_moves
         return temp
+
+    def get_cache_state(self):
+        return self.board.tobytes()
+
+    def reset(self):
+        self.outcome = None
+        self.turn = Turn.PLAYER_1
+        self.n_moves = 0
+        self.board = np.zeros((3, 3), dtype=np.int8)
     
     def step(self, action: int):
         position = self.get_move(action)

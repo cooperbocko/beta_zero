@@ -4,10 +4,10 @@ import numpy as np
 
 from model import ReplayBuffer
 
-class C4ReplayBuffer(ReplayBuffer):
+class TTTReplayBuffer(ReplayBuffer):
     def __init__(self, max_size=10000):
         super().__init__(max_size)
-        
+
     def sample(self, batch_size):
         states = []
         action_probs = []

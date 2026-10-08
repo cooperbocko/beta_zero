@@ -18,10 +18,9 @@ class Connect4BitBoard(Game):
     00| 07| 14| 21| 28| 35| 42
     '''
     def __init__(self):
+        super().__init__()
         self.position = 0
         self.mask = 0
-        self.turn = Turn.PLAYER_1
-        self.outcome = None
         
     def step(self, action: int):
         if self.outcome is not None:
@@ -41,6 +40,12 @@ class Connect4BitBoard(Game):
         temp.turn = self.turn
         temp.outcome = self.outcome
         return temp
+    
+    def reset(self):
+        self.position = 0
+        self.mask = 0
+        self.turn = Turn.PLAYER_1
+        self.outcome = None
     
     def get_state(self):
         player = np.zeros((6, 7))

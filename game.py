@@ -13,6 +13,9 @@ class Outcome(int, Enum):
     DRAW = 2
     
 class Game(ABC):
+    def __init__(self):
+        self.outcome = None
+        self.turn = Turn.PLAYER_1
     # returns a copy of the game
     @abstractmethod
     def copy(self):
@@ -41,4 +44,9 @@ class Game(ABC):
     # prints the board
     @abstractmethod
     def print_board(self):
+        pass
+
+    # resets the game
+    @abstractmethod
+    def reset(self):
         pass
