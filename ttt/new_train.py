@@ -29,14 +29,14 @@ if __name__ == "__main__":
         'game': TicTacToe(),
         'n_games': 10,
         'n_workers': 10,
-        'n_iterations': 100,
-        'temp_moves': 4,
+        'n_iterations': 200,
+        'temp_moves': 4, # number of moves to play before temperature drops
         'batch_size': 64,
         'mini_batches': 100,
         'training_iterations': 100,
         'train_device': torch.device('cuda'),
-        'epsilon': 0.25,
-        'alpha': 1.0,
+        'epsilon': 0.25, # should probably stay at 0.25
+        'alpha': 1.0, # aplha * number of moves = ~10
         'worker_device': torch.device('cpu'),
         'model_kwargs': {
             'input_channels': 2,

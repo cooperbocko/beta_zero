@@ -143,7 +143,7 @@ class MCTS:
             return None
         elif node.state.outcome == Outcome.DRAW:
             return 0
-        elif node.state.outcome == self.root.state.turn:
+        elif node.state.outcome == node.state.turn:
             return 1
         else:
             return -1

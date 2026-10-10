@@ -83,8 +83,6 @@ def train(game: Game, n_games: int, n_workers: int, n_iterations: int, temp_move
     model_iteration = load_latest(model, trainer.optimizer, model_folder)
     data_queue = mp.Queue() # worker game (states, probs, values) 
 
-    print(f'GAME: {game} N_GAMES: {n_games} N_WORKERS: {n_workers} N_ITERATIONS: {n_iterations} TEMP_MOVES: {temp_moves} BATCH_SIZE: {batch_size} MINI_BATCHES: {mini_batches} TRAINING_ITERATIONS: {training_iterations}')
-
     # main training loop
     for _ in range(training_iterations):
         # workers
